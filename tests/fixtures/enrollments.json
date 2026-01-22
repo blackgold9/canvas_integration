@@ -1,0 +1,18 @@
+[
+    {
+        "id": 999,
+        "user_id": 67890,
+        "course_id": 101,
+        "type": "StudentEnrollment",
+        "grades": {
+            "current_score": 95.5,
+            "current_grade": "A",
+            "final_score": 94.0,
+            "final_grade": "A"
+        },
+        "course": {
+            "id": 101,
+            "name": "Math 101"
+        }
+    }
+]

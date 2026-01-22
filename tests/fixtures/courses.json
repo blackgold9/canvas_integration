@@ -1,0 +1,12 @@
+[
+    {
+        "id": 101,
+        "name": "Math 101",
+        "course_code": "MATH101"
+    },
+    {
+        "id": 102,
+        "name": "History 101",
+        "course_code": "HIST101"
+    }
+]

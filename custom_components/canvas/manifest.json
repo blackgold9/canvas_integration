@@ -1,0 +1,13 @@
+{
+  "domain": "canvas",
+  "name": "Canvas LMS",
+  "codeowners": [
+    "@blackgold9"
+  ],
+  "config_flow": true,
+  "documentation": "https://github.com/blackgold9/canvas_integration",
+  "integration_type": "hub",
+  "iot_class": "cloud_polling",
+  "requirements": [],
+  "version": "1.0.0"
+}

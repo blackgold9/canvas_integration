@@ -1,0 +1,14 @@
+[
+    {
+        "id": 1,
+        "name": "Homework 1",
+        "due_at": "2026-02-01T23:59:59Z",
+        "course_id": 101
+    },
+    {
+        "id": 2,
+        "name": "Quiz 1",
+        "due_at": "2026-02-05T23:59:59Z",
+        "course_id": 101
+    }
+]
