@@ -53,3 +53,14 @@ def test_filter_submitted():
     result = filter_assignments(assignments, now, "today")
     assert len(result) == 1
     assert result[0].name == "Unsubmitted"
+
+def test_filter_upcoming_week():
+    now = datetime(2026, 1, 22, 10, 0, 0, tzinfo=timezone.utc)
+    assignments = [
+        CanvasAssignment("1", "Upcoming", "Math", now + timedelta(days=3)),
+        CanvasAssignment("2", "Too Far", "Math", now + timedelta(days=10)),
+    ]
+    
+    result = filter_assignments(assignments, now, "upcoming_week", days=7)
+    assert len(result) == 1
+    assert result[0].name == "Upcoming"

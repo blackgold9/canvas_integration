@@ -43,7 +43,7 @@ async def async_setup_entry(
                 coordinator, 
                 student_id, 
                 student_name, 
-                "upcoming", 
+                "upcoming_week", 
                 days=entry.options.get(CONF_UPCOMING_DAYS, DEFAULT_UPCOMING_DAYS)
             ),
             CanvasAssignmentSensor(
@@ -145,7 +145,7 @@ class CanvasAssignmentSensor(CoordinatorEntity[CanvasDataUpdateCoordinator], Sen
         coordinator: CanvasDataUpdateCoordinator,
         student_id: str,
         student_name: str,
-        sensor_type: str, # 'today', 'tomorrow', 'upcoming', 'missed'
+        sensor_type: str, # 'today', 'tomorrow', 'upcoming_week', 'missed'
         days: int | None = None,
     ) -> None:
         """Initialize the sensor."""
@@ -159,13 +159,13 @@ class CanvasAssignmentSensor(CoordinatorEntity[CanvasDataUpdateCoordinator], Sen
         type_names = {
             "today": "Due Today",
             "tomorrow": "Due Tomorrow",
-            "upcoming": "Upcoming",
+            "upcoming_week": "Upcoming Week",
             "missed": "Missed",
         }
         icons = {
             "today": "mdi:calendar-today",
             "tomorrow": "mdi:calendar-arrow-right",
-            "upcoming": "mdi:calendar-clock",
+            "upcoming_week": "mdi:calendar-clock",
             "missed": "mdi:calendar-remove",
         }
         

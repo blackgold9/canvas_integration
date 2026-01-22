@@ -76,7 +76,7 @@ def filter_assignments(
             include = local_due_date == local_today
         elif filter_type == "tomorrow":
             include = local_due_date == (local_today + timedelta(days=1))
-        elif filter_type == "upcoming":
+        elif filter_type == "upcoming_week":
             limit = now + timedelta(days=days)
             include = now < assignment.due_at <= limit
         elif filter_type == "missed":
