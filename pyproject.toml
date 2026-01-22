@@ -11,6 +11,7 @@ dependencies = [
     "aiohttp>=3.11.11",
     "async-timeout>=5.0.1",
     "homeassistant>=2024.12.5",
+    "python-dotenv>=1.2.1",
 ]
 
 [build-system]

@@ -12,6 +12,7 @@ from .api import CanvasAPI
 from .const import DOMAIN
 from .assignment_logic import CanvasAssignment
 from .student_logic import CanvasStudentData
+from datetime import datetime, timedelta
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -52,45 +53,48 @@ class CanvasDataUpdateCoordinator(DataUpdateCoordinator):
 
             for student in students:
                 student_id = student["id"]
-                # 2. Get Courses for this student
+                # 2. Get ALL Courses with Grades in 1 call
                 courses = await self.api.async_get_courses(user_id=student_id)
                 _LOGGER.debug("Found %s courses for student %s", len(courses), student_id)
                 
-                # 3. For each course, get the student's enrollment to get grades
-                # AND Get Assignments
-                all_assignments = []
                 final_courses = []
+                context_codes = []
                 for course in courses:
-                    course_id = course["id"]
                     if not course.get("name"):
                         continue
                     
-                    try:
-                        # Get enrollment for grades
-                        enrollments = await self.api.async_get_enrollment_for_course(course_id, student_id)
-                        if enrollments:
-                            course["enrollments"] = enrollments
-                            final_courses.append(course)
-                        
-                        # Get assignments
-                        assignments = await self.api.async_get_assignments(course_id)
-                        for assignment in assignments:
-                            assignment["course_name"] = course.get("name")
-                            assignment["student_name"] = student.get("name")
-                        all_assignments.extend(assignments)
-                        _LOGGER.debug("Course %s: found %s assignments", course_id, len(assignments))
-                    except Exception as err:
-                        _LOGGER.warning("Could not fetch data for course %s: %s", course_id, err)
+                    # Filter out archived courses
+                    term_name = course.get("term", {}).get("name", "")
+                    if "Archive" in term_name:
+                        _LOGGER.debug("Skipping archived course: %s (%s)", course.get("name"), term_name)
+                        continue
+
+                    final_courses.append(course)
+                    context_codes.append(f"course_{course['id']}")
+
+                # 3. Get ALL Assignments/Submissions via Planner API in 1 call
+                # Setting range from 30 days ago to 365 days ahead
+                start_date = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+                end_date = (datetime.now() + timedelta(days=365)).strftime("%Y-%m-%d")
+                
+                all_assignments = []
+                if context_codes:
+                    planner_items = await self.api.async_get_planner_items(
+                        student_id, start_date, end_date, context_codes
+                    )
+                    
+                    for item in planner_items:
+                        if item.get("plannable_type") == "assignment":
+                            all_assignments.append(CanvasAssignment.from_dict(item))
+
+                _LOGGER.debug("Student %s: found %s total assignments via Planner", student_id, len(all_assignments))
 
                 # Wrap in student logic class
                 data["student_data"][student_id] = CanvasStudentData(
                     student_id=student_id,
                     name=student.get("name", f"Student {student_id}"),
                     courses=final_courses,
-                    assignments=[
-                        CanvasAssignment.from_dict(a, a.get("course_name", "Unknown"))
-                        for a in all_assignments
-                    ]
+                    assignments=all_assignments
                 )
 
             return data

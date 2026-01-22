@@ -1060,6 +1060,7 @@ dependencies = [
     { name = "homeassistant", version = "2024.12.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.13'" },
     { name = "homeassistant", version = "2025.4.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.13' and python_full_version < '3.13.2'" },
     { name = "homeassistant", version = "2026.1.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.13.2'" },
+    { name = "python-dotenv" },
 ]
 
 [package.dev-dependencies]
@@ -1074,6 +1075,7 @@ requires-dist = [
     { name = "aiohttp", specifier = ">=3.11.11" },
     { name = "async-timeout", specifier = ">=5.0.1" },
     { name = "homeassistant", specifier = ">=2024.12.5" },
+    { name = "python-dotenv", specifier = ">=1.2.1" },
 ]
 
 [package.metadata.requires-dev]

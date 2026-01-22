@@ -24,9 +24,6 @@ class CanvasAPI:
         """Get observed students."""
         return await self._async_get_paginated("/api/v1/users/self/observees")
 
-    async def async_get_enrollment_for_course(self, course_id: str, user_id: str) -> list:
-        """Get a specific user's enrollment in a course."""
-        return await self._async_get_paginated(f"/api/v1/courses/{course_id}/enrollments", params={"user_id": user_id})
 
     async def async_get_enrollments(self, user_id: str) -> list:
         """Get enrollments for a user (includes grades and course)."""
@@ -34,26 +31,38 @@ class CanvasAPI:
         return await self._async_get_paginated(f"/api/v1/users/{user_id}/enrollments", params=params)
 
     async def async_get_courses(self, user_id: str | None = None) -> list:
-        """Get courses for a user."""
-        endpoint = "/api/v1/courses"
-        if user_id:
-            endpoint = f"/api/v1/users/{user_id}/courses"
-        
-        # Include enrollments to get grades
-        params = {"include[]": "enrollments"}
+        """Get courses for a user, including total scores and term info."""
+        endpoint = f"/api/v1/users/{user_id}/courses" if user_id else "/api/v1/courses"
+        params = [("include[]", "total_scores"), ("include[]", "term")]
         return await self._async_get_paginated(endpoint, params=params)
 
     async def async_get_assignments(self, course_id: str) -> list:
         """Get assignments for a course."""
         return await self._async_get_paginated(f"/api/v1/courses/{course_id}/assignments")
 
-    async def _async_get_paginated(self, endpoint: str, params: dict | None = None) -> list:
+    async def async_get_planner_items(self, student_id: str, start_date: str, end_date: str, context_codes: list[str]) -> list:
+        """Get planner items for a student in bulk."""
+        params = [
+            ("observed_user_id", student_id),
+            ("start_date", start_date),
+            ("end_date", end_date),
+        ]
+        for code in context_codes:
+            params.append(("context_codes[]", code))
+            
+        return await self._async_get_paginated("/api/v1/planner/items", params=params)
+
+    async def _async_get_paginated(self, endpoint: str, params: dict | list | None = None) -> list:
         """Make a GET request and follow pagination links."""
         if params is None:
             params = {}
         
-        # Request more items per page to reduce API calls
-        params["per_page"] = 100
+        # Ensure per_page is set
+        if isinstance(params, dict):
+            params["per_page"] = 100
+        else:
+            # list of tuples
+            params.append(("per_page", 100))
         
         results = []
         url = f"{self._url}{endpoint}"

@@ -5,13 +5,18 @@ from custom_components.canvas.calendar_logic import get_calendar_events
 
 def test_assignment_parsing():
     data = {
-        "id": 123,
-        "name": "Homework",
-        "due_at": "2026-01-22T23:59:59Z",
-        "description": "Do work"
+        "context_name": "Math",
+        "plannable": {
+            "id": 123,
+            "title": "Homework",
+            "due_at": "2026-01-22T23:59:59Z",
+            "description": "Do work"
+        },
+        "submissions": {"submitted": False}
     }
-    assignment = CanvasAssignment.from_dict(data, "Math")
+    assignment = CanvasAssignment.from_dict(data)
     assert assignment.name == "Homework"
+    assert assignment.course_name == "Math"
     assert assignment.due_at.year == 2026
     assert assignment.due_at.month == 1
     assert assignment.due_at.day == 22
@@ -37,3 +42,14 @@ def test_calendar_transformation():
     assert len(events) == 1
     assert events[0].summary == "[Math] HW 1"
     assert events[0].end == now + timedelta(hours=1)
+
+def test_filter_submitted():
+    now = datetime(2026, 1, 22, 10, 0, 0, tzinfo=timezone.utc)
+    assignments = [
+        CanvasAssignment("1", "Unsubmitted", "Math", now, is_submitted=False),
+        CanvasAssignment("2", "Submitted", "Math", now, is_submitted=True),
+    ]
+    
+    result = filter_assignments(assignments, now, "today")
+    assert len(result) == 1
+    assert result[0].name == "Unsubmitted"

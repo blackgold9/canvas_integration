@@ -14,27 +14,40 @@ class CanvasAssignment:
     name: str
     course_name: str
     due_at: datetime | None
+    is_submitted: bool = False
     description: str = ""
 
     @classmethod
-    def from_dict(cls, data: dict, course_name: str) -> CanvasAssignment:
-        """Create from a dictionary."""
-        due_at_str = data.get("due_at")
+    def from_dict(cls, data: dict) -> CanvasAssignment:
+        """Create from a Planner API item dictionary."""
+        # Planner API has 'plannable' for the object and 'submissions' for status
+        plannable = data.get("plannable", {})
+        submissions = data.get("submissions", {})
+        
+        due_at_str = plannable.get("due_at")
         due_at = None
         if due_at_str:
             try:
-                # Use fromisoformat for speed, but handle Z suffix
                 clean_date = due_at_str.replace("Z", "+00:00")
                 due_at = datetime.fromisoformat(clean_date)
             except ValueError:
                 _LOGGER.warning("Could not parse due_at date: %s", due_at_str)
 
+        # Determine submission status from Planner 'submissions' object
+        is_submitted = False
+        if isinstance(submissions, dict):
+            # Planner API provides 'submitted' and 'graded' booleans directly
+            is_submitted = submissions.get("submitted", False) or submissions.get("graded", False)
+        elif submissions is True:
+            is_submitted = True
+
         return cls(
-            id=str(data.get("id")),
-            name=data.get("name", "Unknown"),
-            course_name=course_name,
+            id=str(plannable.get("id")),
+            name=plannable.get("title", "Unknown"),
+            course_name=data.get("context_name", "Unknown"),
             due_at=due_at,
-            description=data.get("description", ""),
+            is_submitted=is_submitted,
+            description=plannable.get("description", ""),
         )
 
 def filter_assignments(
@@ -48,6 +61,10 @@ def filter_assignments(
     filtered = []
 
     for assignment in assignments:
+        # Hide anything already submitted from sensors
+        if assignment.is_submitted:
+            continue
+
         if not assignment.due_at:
             continue
             

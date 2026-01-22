@@ -1,4 +1,5 @@
-custom_components/canvas/__pycache__
-tests/__pycache__
+custom_components/canvas/__pycache__/
+.env
+.pytest_cache/
+__pycache__
 venv/
-
