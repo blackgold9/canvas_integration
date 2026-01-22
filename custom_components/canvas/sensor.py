@@ -29,7 +29,7 @@ async def async_setup_entry(
             # Check if there's an enrollment with a grade
             enrollments = course.get("enrollments", [])
             for enrollment in enrollments:
-                if enrollment.get("type") == "student":
+                if enrollment.get("type") == "StudentEnrollment":
                     entities.append(
                         CanvasGradeSensor(
                             coordinator,

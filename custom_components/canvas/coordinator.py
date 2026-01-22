@@ -46,11 +46,13 @@ class CanvasDataUpdateCoordinator(DataUpdateCoordinator):
             
             data["students"] = students
             data["student_data"] = {}
+            _LOGGER.debug("Found %s students", len(students))
 
             for student in students:
                 student_id = student["id"]
                 # 2. Get Courses for this student
                 courses = await self.api.async_get_courses(user_id=student_id)
+                _LOGGER.debug("Found %s courses for student %s", len(courses), student_id)
                 
                 # 3. For each course, get the student's enrollment to get grades
                 # AND Get Assignments
@@ -74,6 +76,7 @@ class CanvasDataUpdateCoordinator(DataUpdateCoordinator):
                             assignment["course_name"] = course.get("name")
                             assignment["student_name"] = student.get("name")
                         all_assignments.extend(assignments)
+                        _LOGGER.debug("Course %s: found %s assignments", course_id, len(assignments))
                     except Exception as err:
                         _LOGGER.warning("Could not fetch data for course %s: %s", course_id, err)
 

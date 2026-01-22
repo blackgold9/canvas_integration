@@ -1,7 +1,7 @@
 """Calendar platform for Canvas LMS."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 
 from homeassistant.components.calendar import CalendarEntity, CalendarEvent
@@ -51,7 +51,8 @@ class CanvasCalendarEntity(CoordinatorEntity[CanvasDataUpdateCoordinator], Calen
     @property
     def event(self) -> CalendarEvent | None:
         """Return the next upcoming event."""
-        events = self._get_events(datetime.now(), datetime.now() + dt_util.dt.timedelta(days=365))
+        now = dt_util.now()
+        events = self._get_events(now, now + timedelta(days=365))
         return events[0] if events else None
 
     def _get_events(self, start_date: datetime, end_date: datetime) -> list[CalendarEvent]:
@@ -75,7 +76,7 @@ class CanvasCalendarEntity(CoordinatorEntity[CanvasDataUpdateCoordinator], Calen
                     CalendarEvent(
                         summary=f"[{assignment['course_name']}] {assignment['name']}",
                         start=due_date,
-                        end=due_date + dt_util.dt.timedelta(hours=1),
+                        end=due_date + timedelta(hours=1),
                         description=assignment.get("description", ""),
                         location="Canvas",
                     )
