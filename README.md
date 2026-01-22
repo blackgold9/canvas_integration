@@ -5,6 +5,7 @@ A custom Home Assistant integration to monitor student progress, grades, and upc
 ## Features
 - **Student-Centric Sensors**: Individual sensors for each student found in your account.
 - **Course Grades**: Real-time tracking of current scores and grades for every enrolled course.
+- **Intelligent Assignment Tracking**: Dedicated sensors for assignments due **Today**, **Tomorrow**, **Upcoming** (next 7 days), and **Missed** (last 7 days).
 - **Assignment Calendar**: Dedicated calendar entities for each student showing all upcoming assignment due dates.
 - **Easy Configuration**: Simple setup through the Home Assistant UI using your Canvas URL and Access Token.
 
@@ -29,10 +30,13 @@ A custom Home Assistant integration to monitor student progress, grades, and upc
 ## Available Entities
 
 ### Sensors
-Every course for every student will have a sensor:
-- `sensor.[student_name]_[course_name]_grade`
-- **State**: Current score percentage or letter grade.
-- **Attributes**: `current_score`, `current_grade`, `final_score`, `final_grade`.
+For every student, the following sensors are created:
+- `sensor.[student_name]_assignments_today`: Count of assignments due by midnight tonight.
+- `sensor.[student_name]_assignments_tomorrow`: Count of assignments due by midnight tomorrow.
+- `sensor.[student_name]_assignments_upcoming`: Count of assignments due in the next **7 days**.
+- `sensor.[student_name]_assignments_missed`: Count of incomplete assignments from the last **7 days**.
+- `sensor.[student_name]_[course_name]_grade`: Current score percentage or letter grade.
+    - **Attributes**: `current_score`, `current_grade`, `final_score`, `final_grade`.
 
 ### Calendar
 Every student will have a calendar entity:
