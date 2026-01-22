@@ -10,6 +10,8 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .api import CanvasAPI
 from .const import DOMAIN
+from .assignment_logic import CanvasAssignment
+from .student_logic import CanvasStudentData
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -80,11 +82,16 @@ class CanvasDataUpdateCoordinator(DataUpdateCoordinator):
                     except Exception as err:
                         _LOGGER.warning("Could not fetch data for course %s: %s", course_id, err)
 
-                data["student_data"][student_id] = {
-                    "info": student,
-                    "courses": final_courses,
-                    "assignments": all_assignments,
-                }
+                # Wrap in student logic class
+                data["student_data"][student_id] = CanvasStudentData(
+                    student_id=student_id,
+                    name=student.get("name", f"Student {student_id}"),
+                    courses=final_courses,
+                    assignments=[
+                        CanvasAssignment.from_dict(a, a.get("course_name", "Unknown"))
+                        for a in all_assignments
+                    ]
+                )
 
             return data
         except Exception as exception:

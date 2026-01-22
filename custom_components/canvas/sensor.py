@@ -1,7 +1,7 @@
 """Sensor platform for Canvas LMS."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
@@ -19,6 +19,7 @@ from .const import (
     CONF_MISSED_DAYS,
 )
 from .coordinator import CanvasDataUpdateCoordinator
+from .assignment_logic import filter_assignments
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -32,8 +33,7 @@ async def async_setup_entry(
     
     # Create sensors for each student
     for student_id, student_data in coordinator.data["student_data"].items():
-        student_info = student_data["info"]
-        student_name = student_info.get("name", f"Student {student_id}")
+        student_name = student_data.name
         
         # 1. Assignment Timeline/Summary Sensors
         entities.extend([
@@ -183,49 +183,27 @@ class CanvasAssignmentSensor(CoordinatorEntity[CanvasDataUpdateCoordinator], Sen
     def _update_list(self) -> None:
         """Filter the coordinator data for this sensor's time window."""
         student_data = self.coordinator.data["student_data"].get(self._student_id)
-        if not student_data or "assignments" not in student_data:
+        if not student_data:
             self._assignments = []
             return
 
+        # Use our external logic for filtering
         now = dt_util.now()
-        local_today = now.date()
-        
-        assignments = []
-        for assignment in student_data["assignments"]:
-            due_at_str = assignment.get("due_at")
-            if not due_at_str:
-                continue
-            
-            due_at = dt_util.parse_datetime(due_at_str)
-            if not due_at:
-                continue
+        filtered = filter_assignments(
+            student_data.assignments, 
+            now, 
+            self._sensor_type, 
+            days=self._days or 7
+        )
 
-            local_due = dt_util.as_local(due_at)
-            local_due_date = local_due.date()
-
-            include = False
-            
-            if self._sensor_type == "today":
-                include = local_due_date == local_today
-            elif self._sensor_type == "tomorrow":
-                include = local_due_date == (local_today + timedelta(days=1))
-            elif self._sensor_type == "upcoming":
-                limit = now + timedelta(days=self._days or 7)
-                include = now < due_at <= limit
-            elif self._sensor_type == "missed":
-                limit = now - timedelta(days=self._days or 7)
-                include = limit <= due_at <= now
-
-            if include:
-                assignments.append({
-                    "name": assignment["name"],
-                    "course": assignment.get("course_name", "Unknown"),
-                    "due_at": due_at_str,
-                })
-
-        # Sort: Upcoming/Soonest first, but for missed show most recent first
-        reverse_sort = self._sensor_type == "missed"
-        self._assignments = sorted(assignments, key=lambda x: x["due_at"], reverse=reverse_sort)
+        self._assignments = [
+            {
+                "name": a.name,
+                "course": a.course_name,
+                "due_at": a.due_at.isoformat() if a.due_at else None,
+            }
+            for a in filtered
+        ]
 
     @property
     def extra_state_attributes(self) -> dict:

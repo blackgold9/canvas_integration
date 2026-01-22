@@ -48,14 +48,12 @@ The integration uses the Enrollments API to ensure it works correctly for both S
 
 ## Testing
 To run the automated mock tests:
-1.  Set up a virtual environment and install dependencies:
+1.  Install `uv` (if not already installed).
+2.  Install dependencies and sync the environment:
     ```bash
-    python3 -m venv venv
-    source venv/bin/activate
-    pip install aiohttp async-timeout python-dotenv pytest pytest-asyncio aresponses
+    uv sync
     ```
-2.  Run the tests using `pytest`:
+3.  Run the tests using `uv run pytest`:
     ```bash
-    export PYTHONPATH=$PYTHONPATH:.
-    pytest tests/
+    uv run pytest
     ```

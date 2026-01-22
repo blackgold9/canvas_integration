@@ -13,6 +13,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
 from .coordinator import CanvasDataUpdateCoordinator
+from .calendar_logic import get_calendar_events
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -26,9 +27,7 @@ async def async_setup_entry(
 
     entities = []
     for student_id, student_data in coordinator.data["student_data"].items():
-        student_info = student_data["info"]
-        student_name = student_info.get("name", f"Student {student_id}")
-        entities.append(CanvasCalendarEntity(coordinator, student_id, student_name))
+        entities.append(CanvasCalendarEntity(coordinator, student_id, student_data.name))
 
     async_add_entities(entities)
 
@@ -58,33 +57,21 @@ class CanvasCalendarEntity(CoordinatorEntity[CanvasDataUpdateCoordinator], Calen
     def _get_events(self, start_date: datetime, end_date: datetime) -> list[CalendarEvent]:
         """Get events between two dates."""
         student_data = self.coordinator.data["student_data"].get(self._student_id)
-        if not student_data or "assignments" not in student_data:
+        if not student_data:
             return []
 
-        events = []
-        for assignment in student_data["assignments"]:
-            due_at = assignment.get("due_at")
-            if not due_at:
-                continue
-
-            due_date = dt_util.parse_datetime(due_at)
-            if not due_date:
-                continue
-
-            if start_date <= due_date <= end_date:
-                events.append(
-                    CalendarEvent(
-                        summary=f"[{assignment['course_name']}] {assignment['name']}",
-                        start=due_date,
-                        end=due_date + timedelta(hours=1),
-                        description=assignment.get("description", ""),
-                        location="Canvas",
-                    )
-                )
-
-        # Sort by start date
-        events.sort(key=lambda x: x.start)
-        return events
+        logic_events = get_calendar_events(student_data.assignments, start_date, end_date)
+        
+        return [
+            CalendarEvent(
+                summary=event.summary,
+                start=event.start,
+                end=event.end,
+                description=event.description,
+                location=event.location,
+            )
+            for event in logic_events
+        ]
 
     async def async_get_events(
         self,

@@ -93,9 +93,9 @@ async def test_coordinator_update_data(aresponses, mock_observees, mock_courses,
         student_data = data["student_data"][67890]
         
         # Course 101 was added because it had enrollments, 102 was nicht because we mocked empty enrollment
-        assert len(student_data["courses"]) == 1
-        assert student_data["courses"][0]["id"] == 101
+        assert len(student_data.courses) == 1
+        assert student_data.courses[0]["id"] == 101
         
         # Assignments for Course 101
-        assert len(student_data["assignments"]) == 2
-        assert student_data["assignments"][0]["name"] == "Homework 1"
+        assert len(student_data.assignments) == 2
+        assert student_data.assignments[0].name == "Homework 1"
