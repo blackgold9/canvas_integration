@@ -3,7 +3,7 @@
 DOMAIN = "canvas"
 
 CONF_URL = "url"
-CONF_TOKEN = "access_token"
+CONF_TOKEN = "token"
 
 ATTR_COURSES = "courses"
 ATTR_STUDENTS = "students"
