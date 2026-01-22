@@ -35,16 +35,25 @@ async def async_setup_entry(
         student_info = student_data["info"]
         student_name = student_info.get("name", f"Student {student_id}")
         
-        # 1. Assignment Summary Sensor
-        entities.append(
-            CanvasAssignmentsSensor(
-                coordinator,
-                student_id,
-                student_name,
-                entry.options.get(CONF_UPCOMING_DAYS, DEFAULT_UPCOMING_DAYS),
-                entry.options.get(CONF_MISSED_DAYS, DEFAULT_MISSED_DAYS),
-            )
-        )
+        # 1. Assignment Timeline/Summary Sensors
+        entities.extend([
+            CanvasAssignmentSensor(coordinator, student_id, student_name, "today"),
+            CanvasAssignmentSensor(coordinator, student_id, student_name, "tomorrow"),
+            CanvasAssignmentSensor(
+                coordinator, 
+                student_id, 
+                student_name, 
+                "upcoming", 
+                days=entry.options.get(CONF_UPCOMING_DAYS, DEFAULT_UPCOMING_DAYS)
+            ),
+            CanvasAssignmentSensor(
+                coordinator, 
+                student_id, 
+                student_name, 
+                "missed", 
+                days=entry.options.get(CONF_MISSED_DAYS, DEFAULT_MISSED_DAYS)
+            ),
+        ])
 
         # 2. Grade sensors for each course
         for course in student_data["courses"]:
@@ -86,9 +95,10 @@ class CanvasGradeSensor(CoordinatorEntity[CanvasDataUpdateCoordinator], SensorEn
         self._attr_name = f"{student_name} - {self._course_name} Grade"
         self._attr_unique_id = f"canvas_{student_id}_{self._course_id}_grade"
         self._attr_icon = "mdi:school"
+        self._attr_native_unit_of_measurement = "%"
 
     @property
-    def state(self) -> str | float | None:
+    def native_value(self) -> str | float | None:
         """Return the state of the sensor."""
         # Refresh enrollment data from coordinator
         student_data = self.coordinator.data["student_data"].get(self._student_id)
@@ -127,51 +137,60 @@ class CanvasGradeSensor(CoordinatorEntity[CanvasDataUpdateCoordinator], SensorEn
             "final_grade": current_grades.get("final_grade"),
         }
 
-class CanvasAssignmentsSensor(CoordinatorEntity[CanvasDataUpdateCoordinator], SensorEntity):
-    """Representation of a Canvas Assignment Summary sensor."""
+class CanvasAssignmentSensor(CoordinatorEntity[CanvasDataUpdateCoordinator], SensorEntity):
+    """Unified Representation of a Canvas Assignment sensor."""
 
     def __init__(
         self,
         coordinator: CanvasDataUpdateCoordinator,
         student_id: str,
         student_name: str,
-        upcoming_days: int,
-        missed_days: int,
+        sensor_type: str, # 'today', 'tomorrow', 'upcoming', 'missed'
+        days: int | None = None,
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._student_id = student_id
         self._student_name = student_name
-        self._upcoming_days = upcoming_days
-        self._missed_days = missed_days
+        self._sensor_type = sensor_type
+        self._days = days
         
-        self._attr_name = f"{student_name} Assignments"
-        self._attr_unique_id = f"canvas_{student_id}_assignments_summary"
-        self._attr_icon = "mdi:notebook-edit"
-        self._upcoming: list[dict] = []
-        self._missed: list[dict] = []
+        # Display Mapping
+        type_names = {
+            "today": "Due Today",
+            "tomorrow": "Due Tomorrow",
+            "upcoming": "Upcoming",
+            "missed": "Missed",
+        }
+        icons = {
+            "today": "mdi:calendar-today",
+            "tomorrow": "mdi:calendar-arrow-right",
+            "upcoming": "mdi:calendar-clock",
+            "missed": "mdi:calendar-remove",
+        }
+        
+        self._attr_name = f"{student_name} Assignments {type_names.get(sensor_type)}"
+        self._attr_unique_id = f"canvas_{student_id}_assignments_{sensor_type}"
+        self._attr_icon = icons.get(sensor_type, "mdi:notebook-edit")
+        self._assignments: list[dict] = []
 
     @property
-    def state(self) -> int:
-        """Return the state of the sensor (total important assignments)."""
-        self._update_assignment_lists()
-        return len(self._upcoming) + len(self._missed)
+    def native_value(self) -> int:
+        """Return the count of assignments."""
+        self._update_list()
+        return len(self._assignments)
 
-    def _update_assignment_lists(self) -> None:
-        """Update the internal lists of upcoming and missed assignments."""
+    def _update_list(self) -> None:
+        """Filter the coordinator data for this sensor's time window."""
         student_data = self.coordinator.data["student_data"].get(self._student_id)
         if not student_data or "assignments" not in student_data:
-            self._upcoming = []
-            self._missed = []
+            self._assignments = []
             return
 
         now = dt_util.now()
-        upcoming_limit = now + dt_util.dt.timedelta(days=self._upcoming_days)
-        missed_limit = now - dt_util.dt.timedelta(days=self._missed_days)
-
-        upcoming = []
-        missed = []
-
+        local_today = now.date()
+        
+        assignments = []
         for assignment in student_data["assignments"]:
             due_at_str = assignment.get("due_at")
             if not due_at_str:
@@ -181,37 +200,41 @@ class CanvasAssignmentsSensor(CoordinatorEntity[CanvasDataUpdateCoordinator], Se
             if not due_at:
                 continue
 
-            assignment_info = {
-                "name": assignment["name"],
-                "course": assignment.get("course_name", "Unknown"),
-                "due_at": due_at_str,
-            }
+            local_due = dt_util.as_local(due_at)
+            local_due_date = local_due.date()
 
-            # Check if it's in the upcoming window
-            if now < due_at <= upcoming_limit:
-                upcoming.append(assignment_info)
+            include = False
             
-            # Check if it's in the missed window
-            # For now, we consider it "missed" if it's past due and within the last X days.
-            # In a future update, we can check for submission status if we fetch it.
-            elif missed_limit <= due_at <= now:
-                # We also check if it has been graded as a proxy for "not missed"
-                # But that's hard to do without assignment-level submission info.
-                # For now, let's keep it simple: past due in the last 7 days.
-                missed.append(assignment_info)
+            if self._sensor_type == "today":
+                include = local_due_date == local_today
+            elif self._sensor_type == "tomorrow":
+                include = local_due_date == (local_today + timedelta(days=1))
+            elif self._sensor_type == "upcoming":
+                limit = now + timedelta(days=self._days or 7)
+                include = now < due_at <= limit
+            elif self._sensor_type == "missed":
+                limit = now - timedelta(days=self._days or 7)
+                include = limit <= due_at <= now
 
-        self._upcoming = sorted(upcoming, key=lambda x: x["due_at"])
-        self._missed = sorted(missed, key=lambda x: x["due_at"], reverse=True)
+            if include:
+                assignments.append({
+                    "name": assignment["name"],
+                    "course": assignment.get("course_name", "Unknown"),
+                    "due_at": due_at_str,
+                })
+
+        # Sort: Upcoming/Soonest first, but for missed show most recent first
+        reverse_sort = self._sensor_type == "missed"
+        self._assignments = sorted(assignments, key=lambda x: x["due_at"], reverse=reverse_sort)
 
     @property
     def extra_state_attributes(self) -> dict:
         """Return entity specific state attributes."""
-        return {
+        attrs = {
             "student_name": self._student_name,
-            "upcoming_assignments": self._upcoming,
-            "missed_assignments": self._missed,
-            "upcoming_count": len(self._upcoming),
-            "missed_count": len(self._missed),
-            "upcoming_window_days": self._upcoming_days,
-            "missed_window_days": self._missed_days,
+            "assignments": self._assignments,
+            "count": len(self._assignments),
         }
+        if self._days:
+            attrs["window_days"] = self._days
+        return attrs
