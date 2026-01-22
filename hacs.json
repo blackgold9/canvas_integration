@@ -1,0 +1,7 @@
+{
+    "name": "Canvas LMS",
+    "homeassistant": "2024.1.0",
+    "render_readme": true,
+    "iot_class": "cloud_polling",
+    "type": "integration"
+}
