@@ -56,7 +56,7 @@ async def async_setup_entry(
         ])
 
         # 2. Grade sensors for each course
-        for course in student_data["courses"]:
+        for course in student_data.courses:
             # Check if there's an enrollment with a grade
             enrollments = course.get("enrollments", [])
             for enrollment in enrollments:
@@ -105,12 +105,11 @@ class CanvasGradeSensor(CoordinatorEntity[CanvasDataUpdateCoordinator], SensorEn
         if not student_data:
             return None
             
-        for course in student_data["courses"]:
+        for course in student_data.courses:
             if course["id"] == self._course_id:
                 for enrollment in course.get("enrollments", []):
-                    grades = enrollment.get("grades", {})
-                    # Return current score or grade from the 'grades' sub-dict
-                    return grades.get("current_score") or grades.get("current_grade")
+                    # For total_scores include, it's computed_current_score
+                    return enrollment.get("computed_current_score") or enrollment.get("computed_current_grade")
         
         return None
 
@@ -121,20 +120,20 @@ class CanvasGradeSensor(CoordinatorEntity[CanvasDataUpdateCoordinator], SensorEn
         if not student_data:
             return {}
             
-        current_grades = {}
-        for course in student_data["courses"]:
+        current_enrollment = {}
+        for course in student_data.courses:
             if course["id"] == self._course_id:
                 for enrollment in course.get("enrollments", []):
-                    current_grades = enrollment.get("grades", {})
+                    current_enrollment = enrollment
                     break
 
         return {
             "course_name": self._course_name,
             "student_name": self._student_name,
-            "current_score": current_grades.get("current_score"),
-            "current_grade": current_grades.get("current_grade"),
-            "final_score": current_grades.get("final_score"),
-            "final_grade": current_grades.get("final_grade"),
+            "current_score": current_enrollment.get("computed_current_score"),
+            "current_grade": current_enrollment.get("computed_current_grade"),
+            "final_score": current_enrollment.get("computed_final_score"),
+            "final_grade": current_enrollment.get("computed_final_grade"),
         }
 
 class CanvasAssignmentSensor(CoordinatorEntity[CanvasDataUpdateCoordinator], SensorEntity):

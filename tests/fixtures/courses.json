@@ -2,11 +2,25 @@
     {
         "id": 101,
         "name": "Math 101",
-        "course_code": "MATH101"
+        "course_code": "MATH101",
+        "enrollments": [
+            {
+                "type": "StudentEnrollment",
+                "computed_current_score": 95.5,
+                "computed_current_grade": "A"
+            }
+        ]
     },
     {
         "id": 102,
         "name": "History 101",
-        "course_code": "HIST101"
+        "course_code": "HIST101",
+        "enrollments": [
+            {
+                "type": "StudentEnrollment",
+                "computed_current_score": 88.0,
+                "computed_current_grade": "B"
+            }
+        ]
     }
 ]

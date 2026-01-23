@@ -1,4 +1,5 @@
 import json
+import re
 import pytest
 import aiohttp
 from unittest.mock import MagicMock
@@ -26,11 +27,11 @@ def mock_assignments():
         return json.load(f)
 
 @pytest.mark.asyncio
-async def test_coordinator_update_data(aresponses, mock_observees, mock_courses, mock_enrollments, mock_assignments):
+async def test_coordinator_update_data(aresponses, mock_observees, mock_courses):
     # 1. Observees
     aresponses.add(
         "example.com",
-        "/api/v1/users/self/observees",
+        re.compile(r"/api/v1/users/self/observees.*"),
         "GET",
         aresponses.Response(text=json.dumps(mock_observees), status=200, content_type="application/json")
     )
@@ -38,41 +39,30 @@ async def test_coordinator_update_data(aresponses, mock_observees, mock_courses,
     # 2. Courses for Student A (67890)
     aresponses.add(
         "example.com",
-        "/api/v1/users/67890/courses",
+        re.compile(r"/api/v1/users/67890/courses.*"),
         "GET",
         aresponses.Response(text=json.dumps(mock_courses), status=200, content_type="application/json")
     )
     
-    # 3. Enrollment for Math 101 (Course 101)
+    # 3. Planner Items for Student A
+    mock_planner_items = [
+        {
+            "plannable_type": "assignment",
+            "context_name": "Math 101",
+            "plannable": {
+                "id": 123,
+                "title": "Homework 1",
+                "due_at": "2026-01-22T23:59:59Z",
+                "description": "Solve problems"
+            },
+            "submissions": {"submitted": False}
+        }
+    ]
     aresponses.add(
         "example.com",
-        "/api/v1/courses/101/enrollments",
+        re.compile(r"/api/v1/planner/items.*"),
         "GET",
-        aresponses.Response(text=json.dumps(mock_enrollments), status=200, content_type="application/json")
-    )
-    
-    # 4. Assignments for Math 101
-    aresponses.add(
-        "example.com",
-        "/api/v1/courses/101/assignments",
-        "GET",
-        aresponses.Response(text=json.dumps(mock_assignments), status=200, content_type="application/json")
-    )
-    
-    # 5. Enrollment for History 101 (Course 102)
-    aresponses.add(
-        "example.com",
-        "/api/v1/courses/102/enrollments",
-        "GET",
-        aresponses.Response(text="[]", status=200, content_type="application/json")
-    )
-    
-    # 6. Assignments for History 101
-    aresponses.add(
-        "example.com",
-        "/api/v1/courses/102/assignments",
-        "GET",
-        aresponses.Response(text="[]", status=200, content_type="application/json")
+        aresponses.Response(text=json.dumps(mock_planner_items), status=200, content_type="application/json")
     )
     
     async with aiohttp.ClientSession() as session:
@@ -92,10 +82,13 @@ async def test_coordinator_update_data(aresponses, mock_observees, mock_courses,
         assert 67890 in data["student_data"]
         student_data = data["student_data"][67890]
         
-        # Course 101 was added because it had enrollments, 102 was nicht because we mocked empty enrollment
-        assert len(student_data.courses) == 1
-        assert student_data.courses[0]["id"] == 101
+        # Both courses matched from the fixture
+        assert len(student_data.courses) == 2
         
-        # Assignments for Course 101
-        assert len(student_data.assignments) == 2
+        # Grade data check
+        enrollment = student_data.courses[0]["enrollments"][0]
+        assert enrollment["computed_current_score"] == 95.5
+        
+        # Assignments for Student A via Planner
+        assert len(student_data.assignments) == 1
         assert student_data.assignments[0].name == "Homework 1"

@@ -33,7 +33,7 @@ class CanvasAPI:
     async def async_get_courses(self, user_id: str | None = None) -> list:
         """Get courses for a user, including total scores and term info."""
         endpoint = f"/api/v1/users/{user_id}/courses" if user_id else "/api/v1/courses"
-        params = [("include[]", "total_scores"), ("include[]", "term")]
+        params = [("include[]", "total_scores"), ("include[]", "term"), ("include[]", "enrollments")]
         return await self._async_get_paginated(endpoint, params=params)
 
     async def async_get_assignments(self, course_id: str) -> list:
