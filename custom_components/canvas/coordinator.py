@@ -7,6 +7,7 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
 from .api import CanvasAPI
 from .const import DOMAIN
@@ -59,15 +60,41 @@ class CanvasDataUpdateCoordinator(DataUpdateCoordinator):
                 
                 final_courses = []
                 context_codes = []
+                now = dt_util.now()
+                grace_period = timedelta(days=7)
+
                 for course in courses:
                     if not course.get("name"):
                         continue
                     
-                    # Filter out archived courses
+                    # 1. Filter out archived courses by name
                     term_name = course.get("term", {}).get("name", "")
                     if "Archive" in term_name:
-                        _LOGGER.debug("Skipping archived course: %s (%s)", course.get("name"), term_name)
+                        _LOGGER.debug("Skipping archived course by name: %s (%s)", course.get("name"), term_name)
                         continue
+
+                    # 2. Filter out administrative/portal courses
+                    course_name = course.get("name", "")
+                    if any(word in course_name for word in ["Students", "Hub"]):
+                        _LOGGER.debug("Skipping administrative course: %s", course_name)
+                        continue
+
+                    # 3. Filter out courses that have already ended (with 7-day grace)
+                    # Check both course and term end dates
+                    end_str = course.get("end_at") or course.get("term", {}).get("end_at")
+                    if end_str:
+                        try:
+                            # Parse with Home Assistant utility for consistency
+                            end_date = dt_util.parse_datetime(end_str)
+                            if end_date and (end_date + grace_period) < now:
+                                _LOGGER.debug(
+                                    "Skipping ended course: %s (Ended: %s)", 
+                                    course.get("name"), 
+                                    end_str
+                                )
+                                continue
+                        except (ValueError, TypeError):
+                            _LOGGER.warning("Could not parse end_at for course %s", course.get("id"))
 
                     final_courses.append(course)
                     context_codes.append(f"course_{course['id']}")

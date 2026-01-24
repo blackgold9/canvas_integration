@@ -9,6 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.util import dt as dt_util
 
 from .const import (
@@ -60,7 +61,8 @@ async def async_setup_entry(
             # Check if there's an enrollment with a grade
             enrollments = course.get("enrollments", [])
             for enrollment in enrollments:
-                if enrollment.get("type") == "StudentEnrollment":
+                enrollment_type = enrollment.get("type", "").lower()
+                if enrollment_type in ["studentenrollment", "student"]:
                     entities.append(
                         CanvasGradeSensor(
                             coordinator,
@@ -96,6 +98,12 @@ class CanvasGradeSensor(CoordinatorEntity[CanvasDataUpdateCoordinator], SensorEn
         self._attr_unique_id = f"canvas_{student_id}_{self._course_id}_grade"
         self._attr_icon = "mdi:school"
         self._attr_native_unit_of_measurement = "%"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, student_id)},
+            name=student_name,
+            manufacturer="Canvas LMS",
+            model="Student",
+        )
 
     @property
     def native_value(self) -> str | float | None:
@@ -172,6 +180,12 @@ class CanvasAssignmentSensor(CoordinatorEntity[CanvasDataUpdateCoordinator], Sen
         self._attr_unique_id = f"canvas_{student_id}_assignments_{sensor_type}"
         self._attr_icon = icons.get(sensor_type, "mdi:notebook-edit")
         self._assignments: list[dict] = []
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, student_id)},
+            name=student_name,
+            manufacturer="Canvas LMS",
+            model="Student",
+        )
 
     @property
     def native_value(self) -> int:

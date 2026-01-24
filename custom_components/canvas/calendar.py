@@ -11,6 +11,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
+from homeassistant.helpers.device_registry import DeviceInfo
 from .const import DOMAIN
 from .coordinator import CanvasDataUpdateCoordinator
 from .calendar_logic import get_calendar_events
@@ -46,6 +47,12 @@ class CanvasCalendarEntity(CoordinatorEntity[CanvasDataUpdateCoordinator], Calen
         self._student_name = student_name
         self._attr_name = f"Canvas - {student_name} Assignments"
         self._attr_unique_id = f"canvas_{student_id}_calendar"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, student_id)},
+            name=student_name,
+            manufacturer="Canvas LMS",
+            model="Student",
+        )
 
     @property
     def event(self) -> CalendarEvent | None:
