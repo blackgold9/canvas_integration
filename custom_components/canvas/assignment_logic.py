@@ -7,6 +7,50 @@ import logging
 
 _LOGGER = logging.getLogger(__name__)
 
+def clean_course_name(name: str | None) -> str:
+    """Clean up Canvas course names by removing common prefixes and suffixes.
+    
+    Handles patterns like:
+    - "- Math 101" -> "Math 101"
+    - "P1-Spanish 2" -> "Spanish 2"
+    - "1st period-Health" -> "Health"
+    - "MATH-101 - Calculus" -> "Calculus"
+    """
+    if not name:
+        return "Unknown Course"
+        
+    cleaned = name.strip()
+    
+    # 1. Handle leading dash/space prefixes
+    if cleaned.startswith("- "):
+        cleaned = cleaned[2:].strip()
+    elif cleaned.startswith("-"):
+        cleaned = cleaned[1:].strip()
+        
+    # 2. Handle common "Period" prefixes: P1-, P2-, 1st-, 1st period-, etc.
+    import re
+    # Match P1-, P10-, 1st-, 1st period-, 1st and 3rd period-
+    period_pattern = r'^([pP]\d+|(\d+(st|nd|rd|th)(\s+and\s+\d+(st|nd|rd|th))?\s+period))[\s-]*'
+    cleaned = re.sub(period_pattern, '', cleaned).strip()
+
+    # 3. Handle separator logic (e.g., CODE - DESCRIPTION or CODE-DESCRIPTION)
+    # Check for " - " first as it's the strongest signal
+    if " - " in cleaned:
+        parts = cleaned.split(" - ", 1)
+        first_part, second_part = parts[0].strip(), parts[1].strip()
+        # Heuristic: first part is short/cody
+        if len(first_part) < 15 and (first_part.isupper() or any(c.isdigit() for c in first_part)):
+            cleaned = second_part
+    elif "-" in cleaned:
+        # Avoid splitting if it's just a hyphenated word
+        parts = cleaned.split("-", 1)
+        first_part, second_part = parts[0].strip(), parts[1].strip()
+        # More conservative check for single dash
+        if len(first_part) < 8 and (first_part.isupper() or any(c.isdigit() for c in first_part)):
+            cleaned = second_part
+            
+    return cleaned
+
 @dataclass
 class CanvasAssignment:
     """Representation of a Canvas Assignment."""
@@ -44,7 +88,7 @@ class CanvasAssignment:
         return cls(
             id=str(plannable.get("id")),
             name=plannable.get("title", "Unknown"),
-            course_name=data.get("context_name", "Unknown"),
+            course_name=clean_course_name(data.get("context_name")),
             due_at=due_at,
             is_submitted=is_submitted,
             description=plannable.get("description", ""),

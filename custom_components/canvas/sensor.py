@@ -20,7 +20,7 @@ from .const import (
     CONF_MISSED_DAYS,
 )
 from .coordinator import CanvasDataUpdateCoordinator
-from .assignment_logic import filter_assignments
+from .assignment_logic import filter_assignments, clean_course_name
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -52,6 +52,12 @@ async def async_setup_entry(
                 student_id, 
                 student_name, 
                 "missed", 
+                days=entry.options.get(CONF_MISSED_DAYS, DEFAULT_MISSED_DAYS)
+            ),
+            CanvasLastMissedSensor(
+                coordinator,
+                student_id,
+                student_name,
                 days=entry.options.get(CONF_MISSED_DAYS, DEFAULT_MISSED_DAYS)
             ),
         ])
@@ -91,7 +97,8 @@ class CanvasGradeSensor(CoordinatorEntity[CanvasDataUpdateCoordinator], SensorEn
         self._student_id = student_id
         self._student_name = student_name
         self._course_id = course["id"]
-        self._course_name = course.get("name", course.get("course_code", "Unknown Course"))
+        raw_name = course.get("name", course.get("course_code", "Unknown Course"))
+        self._course_name = clean_course_name(raw_name)
         self._enrollment = enrollment
         
         self._attr_name = f"{student_name} - {self._course_name} Grade"
@@ -211,6 +218,7 @@ class CanvasAssignmentSensor(CoordinatorEntity[CanvasDataUpdateCoordinator], Sen
 
         self._assignments = [
             {
+                "id": a.id,
                 "name": a.name,
                 "course": a.course_name,
                 "due_at": a.due_at.isoformat() if a.due_at else None,
@@ -219,13 +227,96 @@ class CanvasAssignmentSensor(CoordinatorEntity[CanvasDataUpdateCoordinator], Sen
         ]
 
     @property
+    def assignment_ids(self) -> list[str]:
+        """Return the list of assignment IDs."""
+        return [a["id"] for a in self._assignments]
+
+    @property
     def extra_state_attributes(self) -> dict:
         """Return entity specific state attributes."""
         attrs = {
             "student_name": self._student_name,
             "assignments": self._assignments,
+            "assignment_ids": self.assignment_ids,
             "count": len(self._assignments),
         }
+        if self._days:
+            attrs["window_days"] = self._days
+        return attrs
+
+class CanvasLastMissedSensor(CoordinatorEntity[CanvasDataUpdateCoordinator], SensorEntity):
+    """Representation of the most recently missed Canvas assignment."""
+
+    def __init__(
+        self,
+        coordinator: CanvasDataUpdateCoordinator,
+        student_id: str,
+        student_name: str,
+        days: int | None = None,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator)
+        self._student_id = student_id
+        self._student_name = student_name
+        self._days = days
+        
+        self._attr_name = f"{student_name} Last Missed Assignment"
+        self._attr_unique_id = f"canvas_{student_id}_last_missed"
+        self._attr_icon = "mdi:calendar-alert"
+        self._last_missed: dict | None = None
+        
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, student_id)},
+            name=student_name,
+            manufacturer="Canvas LMS",
+            model="Student",
+        )
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the name of the last missed assignment."""
+        self._update_state()
+        return self._last_missed.get("name") if self._last_missed else None
+
+    def _update_state(self) -> None:
+        """Update the last missed assignment from coordinator data."""
+        student_data = self.coordinator.data["student_data"].get(self._student_id)
+        if not student_data:
+            self._last_missed = None
+            return
+
+        now = dt_util.now()
+        missed = filter_assignments(
+            student_data.assignments, 
+            now, 
+            "missed", 
+            days=self._days or 7
+        )
+
+        if not missed:
+            self._last_missed = None
+            return
+
+        # Sort by due_at descending to get the most recent one
+        # filter_assignments returns a list, we sort it here
+        missed.sort(key=lambda x: x.due_at, reverse=True)
+        
+        latest = missed[0]
+        self._last_missed = {
+            "id": latest.id,
+            "name": latest.name,
+            "course": latest.course_name,
+            "due_at": latest.due_at.isoformat() if latest.due_at else None,
+        }
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Return entity specific state attributes."""
+        attrs = {
+            "student_name": self._student_name,
+        }
+        if self._last_missed:
+            attrs.update(self._last_missed)
         if self._days:
             attrs["window_days"] = self._days
         return attrs
