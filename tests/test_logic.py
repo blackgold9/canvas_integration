@@ -1,6 +1,6 @@
 import pytest
 from datetime import datetime, timedelta, timezone
-from custom_components.canvas.assignment_logic import CanvasAssignment, filter_assignments
+from custom_components.canvas.assignment_logic import CanvasAssignment, filter_assignments, clean_course_name
 from custom_components.canvas.calendar_logic import get_calendar_events
 
 def test_assignment_parsing():
@@ -64,3 +64,20 @@ def test_filter_upcoming_week():
     result = filter_assignments(assignments, now, "upcoming_week", days=7)
     assert len(result) == 1
     assert result[0].name == "Upcoming"
+
+def test_course_name_cleaning():
+    assert clean_course_name("- Math 101") == "Math 101"
+    assert clean_course_name("  - Physics 202  ") == "Physics 202"
+    assert clean_course_name("CHEM-101 - Chemistry") == "Chemistry"
+    assert clean_course_name("BIO101 - Biology") == "Biology"
+    assert clean_course_name("English Comp") == "English Comp"
+    assert clean_course_name(None) == "Unknown Course"
+    
+    # Raw data patterns from diag output
+    assert clean_course_name("1st and 3rd period-Health-Fall2025-Paul") == "Health-Fall2025-Paul"
+    assert clean_course_name("P1-Spanish 2 H-PASSAGLIA") == "Spanish 2 H-PASSAGLIA"
+    assert clean_course_name("P2-Social Studies 6-Goldstein") == "Social Studies 6-Goldstein"
+    assert clean_course_name("7th Grade 4th Period") == "7th Grade 4th Period" # Should not over-clean
+    
+    # Complex but descriptive
+    assert clean_course_name("Introduction to Psychology - Sec 01") == "Introduction to Psychology - Sec 01"
