@@ -101,7 +101,8 @@ class CanvasGradeSensor(CoordinatorEntity[CanvasDataUpdateCoordinator], SensorEn
         self._course_name = clean_course_name(raw_name)
         self._enrollment = enrollment
         
-        self._attr_name = f"{student_name} - {self._course_name} Grade"
+        self._attr_has_entity_name = True
+        self._attr_name = f"{self._course_name} Grade"
         self._attr_unique_id = f"canvas_{student_id}_{self._course_id}_grade"
         self._attr_icon = "mdi:school"
         self._attr_native_unit_of_measurement = "%"
@@ -171,10 +172,10 @@ class CanvasAssignmentSensor(CoordinatorEntity[CanvasDataUpdateCoordinator], Sen
         
         # Display Mapping
         type_names = {
-            "today": "Due Today",
-            "tomorrow": "Due Tomorrow",
-            "upcoming_week": "Upcoming Week",
-            "missed": "Missed",
+            "today": "Assignments Due Today",
+            "tomorrow": "Assignments Due Tomorrow",
+            "upcoming_week": "Assignments Upcoming Week",
+            "missed": "Assignments Missed",
         }
         icons = {
             "today": "mdi:calendar-today",
@@ -183,7 +184,8 @@ class CanvasAssignmentSensor(CoordinatorEntity[CanvasDataUpdateCoordinator], Sen
             "missed": "mdi:calendar-remove",
         }
         
-        self._attr_name = f"{student_name} Assignments {type_names.get(sensor_type)}"
+        self._attr_has_entity_name = True
+        self._attr_name = type_names.get(sensor_type, "Assignments")
         self._attr_unique_id = f"canvas_{student_id}_assignments_{sensor_type}"
         self._attr_icon = icons.get(sensor_type, "mdi:notebook-edit")
         self._assignments: list[dict] = []
@@ -260,7 +262,8 @@ class CanvasLastMissedSensor(CoordinatorEntity[CanvasDataUpdateCoordinator], Sen
         self._student_name = student_name
         self._days = days
         
-        self._attr_name = f"{student_name} Last Missed Assignment"
+        self._attr_has_entity_name = True
+        self._attr_name = "Last Missed Assignment"
         self._attr_unique_id = f"canvas_{student_id}_last_missed"
         self._attr_icon = "mdi:calendar-alert"
         self._last_missed: dict | None = None
